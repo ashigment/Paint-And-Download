@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Рисовалка — Светлая</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f5f7fa, #e8eef5, #dfe9f3);
+    background-size: 400% 400%;
+    animation: bgShift 18s ease infinite;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #1a1a2e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+
+  @keyframes bgShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  h1 {
+    margin-bottom: 20px;
+    font-size: 2rem;
+    background: linear-gradient(90deg, #4facfe, #00c6fb, #a18cd1, #fbc2eb);
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gradientText 5s ease infinite;
+    font-weight: 800;
+  }
+
+  @keyframes gradientText {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  /* ===== Выбор холста ===== */
+  #canvasSelection {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    justify-content: center;
+    max-width: 900px;
+    animation: fadeIn 0.6s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .canvas-btn {
+    padding: 16px 22px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: 2px solid #d0dbe8;
+    border-radius: 14px;
+    background: #ffffff;
+    color: #2c3e50;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(120, 150, 190, 0.15);
+    animation: popIn 0.5s ease backwards;
+  }
+
+  .canvas-btn:hover {
+    transform: translateY(-5px) scale(1.05);
+    border-color: #4facfe;
+    color: #1565c0;
+    box-shadow: 0 12px 28px rgba(79, 172, 254, 0.35);
+  }
+
+  .canvas-btn:active { transform: translateY(-2px) scale(1.02); }
+
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.5); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  /* ===== Рабочая область ===== */
+  #workspace {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    animation: fadeIn 0.6s ease;
+  }
+
+  #workspace.active { display: flex; }
+
+  #toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 18px;
+    background: #ffffff;
+    border: 1px solid #e3ebf3;
+    border-radius: 18px;
+    box-shadow: 0 6px 24px rgba(120, 150, 190, 0.15);
+    animation: slideDown 0.5s ease;
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .tool-btn {
+    padding: 11px 16px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    border: 2px solid #e3ebf3;
+    border-radius: 12px;
+    background: #f7fafd;
+    color: #2c3e50;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .tool-btn:hover:not(:disabled) {
+    background: #eaf4ff;
+    border-color: #4facfe;
+    color: #1565c0;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(79, 172, 254, 0.3);
+  }
+
+  .tool-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .tool-btn.active {
+    background: linear-gradient(135deg, #4facfe, #00c6fb);
+    border-color: #4facfe;
+    color: #fff;
+    box-shadow: 0 0 18px rgba(79, 172, 254, 0.5);
+  }
+
+  input[type="color"] {
+    width: 46px;
+    height: 46px;
+    border: 2px solid #d0dbe8;
+    border-radius: 12px;
+    cursor: pointer;
+    background: #fff;
+    padding: 2px;
+    transition: transform 0.2s;
+  }
+
+  input[type="color"]:hover { transform: scale(1.08); }
+
+  input[type="range"] {
+    width: 110px;
+    accent-color: #4facfe;
+    cursor: pointer;
+  }
+
+  .size-label {
+    font-size: 0.88rem;
+    min-width: 58px;
+    text-align: center;
+    color: #5a6b7d;
+    font-weight: 600;
+  }
+
+  /* Контейнер холста */
+  #canvasContainer {
+    position: relative;
+    max-width: 95vw;
+    max-height: 65vh;
+    overflow: auto;
+    border-radius: 14px;
+    border: 2px solid #d0dbe8;
+    box-shadow: 0 8px 30px rgba(120, 150, 190, 0.2);
+    background: #fff;
+    animation: zoomIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+  }
+
+  @keyframes zoomIn {
+    from { opacity: 0; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  #canvas {
+    display: block;
+    cursor: crosshair;
+    touch-action: none;
+    image-rendering: pixelated;
+  }
+
+  /* ===== РЕЖИМ ФОКУСА ===== */
+  body.focused {
+    background: #000 !important;
+    animation: none !important;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  body.focused h1 { display: none; }
+
+  body.focused #toolbar {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  body.focused #hint { display: none; }
+
+  body.focused #canvasContainer {
+    position: fixed;
+    inset: 0;
+    max-width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    background: #000 !important;
+    z-index: 50;
+    animation: zoomFull 0.4s ease;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Белая обводка вокруг холста — видно границы даже если всё чёрное */
+  body.focused #canvas {
+    outline: 3px solid #ffffff;
+    outline-offset: 0;
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.25);
+    background: #fff;
+    border-radius: 2px;
+  }
+
+  @keyframes zoomFull {
+    from { transform: scale(0.9); opacity: 0.6; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* Плавающие кнопки в режиме фокуса */
+  #focusControls {
+    position: fixed;
+    bottom: 25px;
+    left: 50%;
+    transform: translateX(-50%) translateY(150px);
+    display: flex;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(30, 30, 30, 0.92);
+    backdrop-filter: blur(12px);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 95vw;
+  }
+
+  body.focused #focusControls {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  #focusControls input[type="color"] {
+    width: 42px; height: 42px;
+    border-color: rgba(255,255,255,0.3);
+    background: #222;
+  }
+
+  #focusControls .tool-btn {
+    padding: 9px 14px;
+    font-size: 0.85rem;
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.15);
+    color: #fff;
+  }
+
+  #focusControls .tool-btn:hover:not(:disabled) {
+    background: rgba(79, 172, 254, 0.3);
+    border-color: #4facfe;
+    color: #fff;
+  }
+
+  #focusControls .tool-btn.active {
+    background: linear-gradient(135deg, #4facfe, #00c6fb);
+    color: #fff;
+  }
+
+  #focusControls .size-label { color: #ccc; font-size: 0.82rem; min-width: auto; }
+
+  #focusControls input[type="range"] { width: 90px; }
+
+  /* Кнопка фокуса */
+  #focusBtn {
+    background: linear-gradient(135deg, #a18cd1, #fbc2eb);
+    border: none;
+    color: #fff;
+    padding: 11px 18px;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 0.92rem;
+    box-shadow: 0 4px 14px rgba(161, 140, 209, 0.4);
+  }
+
+  #focusBtn:hover {
+    transform: translateY(-3px) scale(1.04);
+    box-shadow: 0 10px 28px rgba(161, 140, 209, 0.55);
+  }
+
+  .back-btn {
+    background: linear-gradient(135deg, #ff9a9e, #fecfef);
+    border: none;
+    padding: 11px 20px;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 0.92rem;
+    box-shadow: 0 4px 14px rgba(255, 154, 158, 0.4);
+  }
+
+  .back-btn:hover {
+    transform: translateY(-3px) scale(1.04);
+    box-shadow: 0 10px 26px rgba(255, 154, 158, 0.55);
+  }
+
+  /* Подсказка */
+  #hint {
+    font-size: 0.85rem;
+    color: #7a8a9a;
+    text-align: center;
+    padding: 8px;
+  }
+
+  #hint kbd {
+    background: #eef3f8;
+    border: 1px solid #d0dbe8;
+    border-radius: 5px;
+    padding: 2px 6px;
+    font-size: 0.8rem;
+    font-family: monospace;
+    color: #4facfe;
+  }
+
+  /* Уведомление */
+  #toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(120px);
+    background: linear-gradient(135deg, #4facfe, #00c6fb);
+    color: #fff;
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-weight: 700;
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2000;
+    box-shadow: 0 10px 40px rgba(79, 172, 254, 0.5);
+    pointer-events: none;
+  }
+
+  #toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<h1>🎨 Рисовалка</h1>
+
+<!-- Выбор холста -->
+<div id="canvasSelection"></div>
+
+<!-- Рабочая область -->
+<div id="workspace">
+  <div id="toolbar">
+    <input type="color" id="colorPicker" value="#000000" title="Цвет">
+    <button class="tool-btn active" id="brushBtn" title="Обычная кисть">🖌️ Кисть</button>
+    <button class="tool-btn" id="pixelBtn" title="Пиксельная кисть">🟦 Пиксель</button>
+    <button class="tool-btn" id="eraserBtn" title="Ластик">🧽 Ластик</button>
+    <span class="size-label">Размер: <span id="sizeValue">5</span></span>
+    <input type="range" id="sizeSlider" min="1" max="50" value="5">
+    <button class="tool-btn" id="undoBtn" disabled title="Отменить">⬅️</button>
+    <button class="tool-btn" id="redoBtn" disabled title="Повторить">➡️</button>
+    <button class="tool-btn" id="saveBtn" title="Сохранить">💾</button>
+    <button id="focusBtn">🔍 Сосредоточиться на холсте</button>
+    <button class="back-btn" id="backBtn">↩ К выбору</button>
+  </div>
+
+  <div id="canvasContainer">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div id="hint">
+    Кисть: <kbd>B</kbd> · Пиксель: <kbd>P</kbd> · Ластик: <kbd>E</kbd> · Undo: <kbd>Ctrl+Z</kbd> · Выход из фокуса: <kbd>Esc</kbd>
+  </div>
+</div>
+
+<!-- Плавающие инструменты в режиме фокуса -->
+<div id="focusControls">
+  <input type="color" id="colorPickerFocus" value="#000000">
+  <button class="tool-btn active" id="brushBtnFocus">🖌️</button>
+  <button class="tool-btn" id="pixelBtnFocus">🟦</button>
+  <button class="tool-btn" id="eraserBtnFocus">🧽</button>
+  <input type="range" id="sizeSliderFocus" min="1" max="50" value="5">
+  <button class="tool-btn" id="undoBtnFocus" disabled>⬅️</button>
+  <button class="tool-btn" id="redoBtnFocus" disabled>➡️</button>
+  <button class="tool-btn" id="saveBtnFocus">💾</button>
+  <button class="back-btn" id="exitFocusBtn">✕ Выйти</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function() {
+  // ===== КОНФИГ =====
+  const CANVAS_SIZES = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048];
+  const MAX_DISPLAY = 600;
+  const MAX_HISTORY = 50;
+
+  // ===== DOM =====
+  const selectionEl = document.getElementById('canvasSelection');
+  const workspaceEl = document.getElementById('workspace');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const colorPicker = document.getElementById('colorPicker');
+  const brushBtn = document.getElementById('brushBtn');
+  const pixelBtn = document.getElementById('pixelBtn');
+  const eraserBtn = document.getElementById('eraserBtn');
+  const sizeSlider = document.getElementById('sizeSlider');
+  const sizeValue = document.getElementById('sizeValue');
+  const undoBtn = document.getElementById('undoBtn');
+  const redoBtn = document.getElementById('redoBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const backBtn = document.getElementById('backBtn');
+  const focusBtn = document.getElementById('focusBtn');
+  const exitFocusBtn = document.getElementById('exitFocusBtn');
+  const toastEl = document.getElementById('toast');
+
+  const colorPickerF = document.getElementById('colorPickerFocus');
+  const brushBtnF = document.getElementById('brushBtnFocus');
+  const pixelBtnF = document.getElementById('pixelBtnFocus');
+  const eraserBtnF = document.getElementById('eraserBtnFocus');
+  const sizeSliderF = document.getElementById('sizeSliderFocus');
+  const undoBtnF = document.getElementById('undoBtnFocus');
+  const redoBtnF = document.getElementById('redoBtnFocus');
+  const saveBtnF = document.getElementById('saveBtnFocus');
+
+  // ===== СОСТОЯНИЕ =====
+  let currentTool = 'brush';
+  let currentColor = '#000000';
+  let brushSize = 5;
+  let isDrawing = false;
+  let lastX = 0, lastY = 0;
+  let scale = 1;
+  let isFocused = false;
+
+  let history = [];
+  let historyIndex = -1;
+
+  // ===== ВЫБОР ХОЛСТА =====
+  CANVAS_SIZES.forEach((size, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'canvas-btn';
+    btn.textContent = `${size} × ${size}`;
+    btn.style.animationDelay = `${i * 0.05}s`;
+    btn.addEventListener('click', () => selectCanvas(size));
+    selectionEl.appendChild(btn);
+  });
+
+  function selectCanvas(size) {
+    canvas.width = size;
+    canvas.height = size;
+
+    scale = Math.min(1, MAX_DISPLAY / size);
+    canvas.style.width = Math.round(size * scale) + 'px';
+    canvas.style.height = Math.round(size * scale) + 'px';
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+
+    history = [];
+    historyIndex = -1;
+    saveState();
+    updateHistoryButtons();
+
+    selectionEl.style.display = 'none';
+    workspaceEl.classList.add('active');
+
+    showToast(`Холст ${size}×${size} готов`);
+  }
+
+  // ===== ИНСТРУМЕНТЫ =====
+  function setTool(tool) {
+    currentTool = tool;
+    [brushBtn, brushBtnF].forEach(b => b.classList.toggle('active', tool === 'brush'));
+    [pixelBtn, pixelBtnF].forEach(b => b.classList.toggle('active', tool === 'pixel'));
+    [eraserBtn, eraserBtnF].forEach(b => b.classList.toggle('active', tool === 'eraser'));
+  }
+
+  brushBtn.addEventListener('click', () => setTool('brush'));
+  pixelBtn.addEventListener('click', () => setTool('pixel'));
+  eraserBtn.addEventListener('click', () => setTool('eraser'));
+
+  brushBtnF.addEventListener('click', () => setTool('brush'));
+  pixelBtnF.addEventListener('click', () => setTool('pixel'));
+  eraserBtnF.addEventListener('click', () => setTool('eraser'));
+
+  function syncColor(val) {
+    currentColor = val;
+    colorPicker.value = val;
+    colorPickerF.value = val;
+    if (currentTool === 'eraser') setTool('brush');
+  }
+  colorPicker.addEventListener('input', e => syncColor(e.target.value));
+  colorPickerF.addEventListener('input', e => syncColor(e.target.value));
+
+  function syncSize(val) {
+    brushSize = val;
+    sizeValue.textContent = val;
+    sizeSlider.value = val;
+    sizeSliderF.value = val;
+  }
+  sizeSlider.addEventListener('input', e => syncSize(parseInt(e.target.value)));
+  sizeSliderF.addEventListener('input', e => syncSize(parseInt(e.target.value)));
+
+  // ===== РИСОВАНИЕ =====
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) / rect.width * canvas.width,
+      y: (clientY - rect.top) / rect.height * canvas.height
+    };
+  }
+
+  function startDraw(e) {
+    e.preventDefault();
+    isDrawing = true;
+    const pos = getPos(e);
+    lastX = pos.x;
+    lastY = pos.y;
+    drawAt(pos.x, pos.y);
+  }
+
+  function drawMove(e) {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const pos = getPos(e);
+
+    if (currentTool === 'pixel') {
+      drawPixelLine(lastX, lastY, pos.x, pos.y);
+    } else {
+      drawLine(lastX, lastY, pos.x, pos.y);
+    }
+    lastX = pos.x;
+    lastY = pos.y;
+  }
+
+  function endDraw() {
+    if (!isDrawing) return;
+    isDrawing = false;
+    saveState();
+    updateHistoryButtons();
+  }
+
+  function drawAt(x, y) {
+    if (currentTool === 'pixel') {
+      drawPixelLine(x, y, x, y);
+    } else {
+      drawDot(x, y);
+    }
+  }
+
+  function drawDot(x, y) {
+    ctx.beginPath();
+    ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = currentTool === 'eraser' ? '#ffffff' : currentColor;
+    ctx.fill();
+  }
+
+  function drawLine(x1, y1, x2, y2) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : currentColor;
+    ctx.lineWidth = brushSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  }
+
+  // ===== ПИКСЕЛЬНАЯ КИСТЬ =====
+  // Размер пиксельной "кисти" в пикселях холста.
+  // На больших холстах размер = brushSize (масштабируется)
+  // На маленьких — не меньше 1
+  function getPixelCellSize() {
+    // Крупный размер клетки пропорционален размеру кисти
+    // На 2048 холсте ползунок 5 даёт ~15px клетку, 50 → ~150px
+    const base = Math.max(1, Math.round(brushSize * canvas.width / 200));
+    return base;
+  }
+
+  function drawPixelCell(cx, cy, size) {
+    ctx.fillStyle = currentTool === 'eraser' ? '#ffffff' : currentColor;
+    // Выравниваем по сетке клеток
+    const gx = Math.floor(cx / size) * size;
+    const gy = Math.floor(cy / size) * size;
+    ctx.fillRect(gx, gy, size, size);
+  }
+
+  function drawPixelLine(x0, y0, x1, y1) {
+    const size = getPixelCellSize();
+    // Брезенхэм по "клеточной" сетке
+    const cx0 = Math.floor(x0 / size);
+    const cy0 = Math.floor(y0 / size);
+    const cx1 = Math.floor(x1 / size);
+    const cy1 = Math.floor(y1 / size);
+
+    let x = cx0, y = cy0;
+    const dx = Math.abs(cx1 - cx0);
+    const dy = Math.abs(cy1 - cy0);
+    const sx = cx0 < cx1 ? 1 : -1;
+    const sy = cy0 < cy1 ? 1 : -1;
+    let err = dx - dy;
+
+    while (true) {
+      drawPixelCell(x * size, y * size, size);
+      if (x === cx1 && y === cy1) break;
+      const e2 = 2 * err;
+      if (e2 > -dy) { err -= dy; x += sx; }
+      if (e2 < dx) { err += dx; y += sy; }
+    }
+  }
+
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', drawMove);
+  canvas.addEventListener('mouseup', endDraw);
+  canvas.addEventListener('mouseleave', endDraw);
+
+  canvas.addEventListener('touchstart', startDraw, { passive: false });
+  canvas.addEventListener('touchmove', drawMove, { passive: false });
+  canvas.addEventListener('touchend', endDraw);
+  canvas.addEventListener('touchcancel', endDraw);
+
+  // ===== ИСТОРИЯ =====
+  function saveState() {
+    if (historyIndex < history.length - 1) {
+      history = history.slice(0, historyIndex + 1);
+    }
+    history.push(canvas.toDataURL());
+    if (history.length > MAX_HISTORY) history.shift();
+    historyIndex = history.length - 1;
+  }
+
+  function restoreState(index) {
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+    };
+    img.src = history[index];
+  }
+
+  function updateHistoryButtons() {
+    const canUndo = historyIndex > 0;
+    const canRedo = historyIndex < history.length - 1;
+    undoBtn.disabled = !canUndo;
+    redoBtn.disabled = !canRedo;
+    undoBtnF.disabled = !canUndo;
+    redoBtnF.disabled = !canRedo;
+  }
+
+  function undo() {
+    if (historyIndex > 0) {
+      historyIndex--;
+      restoreState(historyIndex);
+      updateHistoryButtons();
+    }
+  }
+
+  function redo() {
+    if (historyIndex < history.length - 1) {
+      historyIndex++;
+      restoreState(historyIndex);
+      updateHistoryButtons();
+    }
+  }
+
+  undoBtn.addEventListener('click', undo);
+  redoBtn.addEventListener('click', redo);
+  undoBtnF.addEventListener('click', undo);
+  redoBtnF.addEventListener('click', redo);
+
+  // ===== СОХРАНЕНИЕ =====
+  function saveImage() {
+    const link = document.createElement('a');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    link.download = `drawing_${canvas.width}x${canvas.height}_${ts}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('✅ Изображение сохранено!');
+  }
+  saveBtn.addEventListener('click', saveImage);
+  saveBtnF.addEventListener('click', saveImage);
+
+  // ===== ФОКУС =====
+  function enterFocus() {
+    isFocused = true;
+    document.body.classList.add('focused');
+    fitCanvasToScreen();
+    showToast('🔍 Режим сосредоточения. Esc для выхода');
+  }
+
+  function exitFocus() {
+    isFocused = false;
+    document.body.classList.remove('focused');
+    canvas.style.width = Math.round(canvas.width * scale) + 'px';
+    canvas.style.height = Math.round(canvas.height * scale) + 'px';
+  }
+
+  function fitCanvasToScreen() {
+    // Оставляем отступ для обводки и панели
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const size = Math.min(vw, vh) * 0.92;
+    canvas.style.width = size + 'px';
+    canvas.style.height = size + 'px';
+  }
+
+  focusBtn.addEventListener('click', enterFocus);
+  exitFocusBtn.addEventListener('click', exitFocus);
+
+  window.addEventListener('resize', () => {
+    if (isFocused) fitCanvasToScreen();
+  });
+
+  // ===== НАЗАД =====
+  backBtn.addEventListener('click', () => {
+    if (isFocused) exitFocus();
+    workspaceEl.classList.remove('active');
+    selectionEl.style.display = 'flex';
+  });
+
+  // ===== КЛАВИШИ =====
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) redo(); else undo();
+      return;
+    }
+    if (e.key === 'Escape' && isFocused) { exitFocus(); return; }
+    if (workspaceEl.classList.contains('active') && !e.ctrlKey && !e.metaKey) {
+      const k = e.key.toLowerCase();
+      if (k === 'b') setTool('brush');
+      else if (k === 'p') setTool('pixel');
+      else if (k === 'e') setTool('eraser');
+    }
+  });
+
+  // ===== TOAST =====
+  let toastTimer;
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+  }
+
+  document.body.classList.remove('focused');
+
+})();
+</script>
+</body>
+</html>
